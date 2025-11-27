@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <title>建築考試總整理 - 完成度心智圖（可改名）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- jsMind CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsmind@0.9.0/style/jsmind.min.css" />
+    <!-- jsMind JS -->
+    <script src="https://cdn.jsdelivr.net/npm/jsmind@0.9.0/es6/jsmind.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+                sans-serif;
+            background: #f5f5f5;
+        }
+
+        header {
+            padding: 8px 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #overallProgress {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        #jsmind_container {
+            width: 100%;
+            height: calc(100vh - 48px);
+            background: #ffffff;
+        }
+
+        /* 讓節點不要把 expander 擋住 */
+        .jmnode {
+            position: relative;
+            overflow: visible !important;
+            z-index: 1;
+        }
+
+
+        /* 隱藏 jsMind 原生的小白圈（canvas 那顆） */
+        .jmexpander {
+            display: none !important;
+        }
+
+        /* 我們自己的外框，用來放文字 + 小白圈 */
+        .node-wrapper {
+            position: relative;
+        }
+
+        /* 自製收納按鍵：長在節點上方 */
+        .node-toggle {
+            position: absolute;
+            top: -12px;              /* 往上疊在節點上方，可自行調整 */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid #666;
+            background: #fff;
+            font-size: 10px;
+            line-height: 12px;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        /* (原本的) 節點內容 */
+        .node-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            white-space: normal;
+            word-break: break-all;
+            max-width: 170px;
+        }
+
+        .node-title {
+            display: inline-block;
+            max-width: 120px;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .node-label input[type="checkbox"] {
+            transform: scale(1.0);
+        }
+
+        .node-progress-text {
+            font-size: 11px;
+            opacity: 0.7;
+            white-space: nowrap;
+        }
+
+
+        /* 節點內容 (checkbox + 文字 + 百分比) */
+        .node-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            white-space: normal;
+            word-break: break-all;
+            max-width: 170px;
+        }
+
+        .node-title {
+            display: inline-block;
+            max-width: 120px;
+            /* 稍微限制寬度，避免吃到 expander */
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .node-label input[type="checkbox"] {
+            transform: scale(1.0);
+        }
+
+        .node-progress-text {
+            font-size: 11px;
+            opacity: 0.7;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div id="overallProgress">整體完成度：0%</div>
+        <div style="font-size:12px;color:#666;">
+            提示：點節點可展開／收合，<b>雙擊節點文字可改名稱</b>
+        </div>
+    </header>
+
+    <div id="jsmind_container"></div>
+
+    <script>
+        // ================================
+        // 1. 樹狀資料
+        // ================================
+        const treeData = {
+            id: "root",
+            topic: "建築考試總整理",
+            children: [
+                {
+                    id: "sub1",
+                    topic: "建築構造與施工",
+                    children: [
+                        {
+                            id: "sub1-1",
+                            topic: "結構體",
+                            children: [
+                                { id: "q1", topic: "基礎工程", isLeaf: true },
+                                { id: "q2", topic: "混凝土構造", isLeaf: true },
+                                { id: "q3", topic: "鋼構造 / SRC", isLeaf: true }
+                            ]
+                        },
+                        {
+                            id: "sub1-2",
+                            topic: "內外裝修",
+                            children: [
+                                { id: "q4", topic: "外殼工程", isLeaf: true },
+                                { id: "q5", topic: "防水 / 隔熱 / 門窗", isLeaf: true }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: "sub2",
+                    topic: "營建法規與實務",
+                    children: [
+                        {
+                            id: "sub2-1",
+                            topic: "建築法系",
+                            children: [
+                                { id: "q6", topic: "建築法", isLeaf: true },
+                                { id: "q7", topic: "建築師法", isLeaf: true },
+                                { id: "q8", topic: "無障礙", isLeaf: true }
+                            ]
+                        },
+                        {
+                            id: "sub2-2",
+                            topic: "技術規則",
+                            children: [
+                                { id: "q9", topic: "一般設計通則", isLeaf: true }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // 將樹狀資料轉成 jsMind node_array 格式
+        function treeToNodeArray(tree) {
+            const list = [];
+
+            function walk(node, parentId = null) {
+                const item = {
+                    id: node.id,
+                    topic: node.topic
+                };
+                if (!parentId) {
+                    item.isroot = true;
+                } else {
+                    item.parentid = parentId;
+                }
+                item.data = {
+                    isLeaf: !!node.isLeaf,
+                    progress: 0
+                };
+                list.push(item);
+
+                if (node.children && node.children.length > 0) {
+                    node.children.forEach(child => walk(child, node.id));
+                }
+            }
+
+            walk(tree);
+            return list;
+        }
+
+        const mind = {
+            meta: {
+                name: "progress-mindmap",
+                author: "Reason",
+                version: "1.0"
+            },
+            format: "node_array",
+            data: treeToNodeArray(treeData)
+        };
+
+        // ================================
+        // 2. 初始化 jsMind
+        // ================================
+        const options = {
+            container: "jsmind_container",
+            editable: false,
+            theme: "primary",
+            view: {
+                engine: "canvas",
+                hmargin: 50,
+                vmargin: 50,
+                line_width: 2,
+                line_color: "#555",
+                node_overflow: "wrap"
+            }
+        };
+
+        const jm = new jsMind(options);
+        jm.show(mind);
+
+        // ================================
+        // 3. 建立 nodeMap / treeNodeMap
+        // ================================
+        const nodeMap = {};
+        const treeNodeMap = {};
+
+        function buildNodeMapFromTree(node, parentId = null) {
+            nodeMap[node.id] = {
+                id: node.id,
+                parentId,
+                childrenIds: (node.children || []).map(c => c.id),
+                isLeaf: !!node.isLeaf,
+                progress: 0
+            };
+            treeNodeMap[node.id] = node;
+
+            (node.children || []).forEach(child =>
+                buildNodeMapFromTree(child, node.id)
+            );
+        }
+
+        buildNodeMapFromTree(treeData);
+
+        // ================================
+        // 4. 把節點變成「文字 + checkbox + 百分比」
+        // ================================
+        function enhanceSingleNode(nodeInfo) {
+            const jmNode = jm.get_node(nodeInfo.id);
+            if (!jmNode) return;
+
+            const el = jmNode._data.view.element;
+
+            if (!nodeInfo.isLeaf) {
+                // 中介節點 / root：上方一顆自製收納按鍵 + 文字 + (xx%)
+                el.innerHTML = `
+                    <div class="node-wrapper">
+                        <button class="node-toggle" type="button" data-node-id="${nodeInfo.id}">○</button>
+                        <span class="node-label">
+                            <span class="node-title" data-node-id="${nodeInfo.id}">${jmNode.topic}</span>
+                            <span class="node-progress-text" data-node-progress="${nodeInfo.id}">(0%)</span>
+                        </span>
+                    </div>
+                `;
+                return;
+            }
+
+            // 葉節點：checkbox + 文字 + (xx%)
+            el.innerHTML = `
+          <label class="node-label">
+            <input type="checkbox" data-node-id="${nodeInfo.id}">
+            <span class="node-title" data-node-id="${nodeInfo.id}">${jmNode.topic}</span>
+            <span class="node-progress-text" data-node-progress="${nodeInfo.id}">(0%)</span>
+          </label>
+        `;
+        }
+
+        function enhanceLeafNodes() {
+            Object.values(nodeMap).forEach(nodeInfo => {
+                enhanceSingleNode(nodeInfo);
+            });
+        }
+
+        enhanceLeafNodes();
+
+        // ================================
+        // 5. 計算進度（由葉節點往上）
+        // ================================
+        function updateProgressFromLeaf(leafId, done) {
+            nodeMap[leafId].progress = done ? 1 : 0;
+
+            let currentId = leafId;
+            while (true) {
+                const current = nodeMap[currentId];
+                if (!current) break;
+
+                const { parentId, childrenIds } = current;
+
+                if (childrenIds && childrenIds.length > 0) {
+                    const sum = childrenIds.reduce(
+                        (acc, cid) => acc + (nodeMap[cid].progress || 0),
+                        0
+                    );
+                    const avg = sum / childrenIds.length;
+                    current.progress = avg;
+                }
+
+                if (!parentId) break;
+                currentId = parentId;
+            }
+
+            refreshProgressDisplay();
+        }
+
+        function refreshProgressDisplay() {
+            Object.values(nodeMap).forEach(nodeInfo => {
+                const span = document.querySelector(
+                    `.node-progress-text[data-node-progress="${nodeInfo.id}"]`
+                );
+                if (span) {
+                    span.textContent = `(${Math.round(nodeInfo.progress * 100)}%)`;
+                }
+            });
+
+            const rootProgress = nodeMap["root"] ? nodeMap["root"].progress : 0;
+            document.getElementById("overallProgress").textContent =
+                `整體完成度：${Math.round(rootProgress * 100)}%`;
+        }
+
+        // ================================
+        // 6. 點節點本體 → 展開／收合
+        // ================================
+        document.getElementById("jsmind_container").addEventListener("click", (e) => {
+            // 1) 先看是不是點到自製的小白圈
+            const toggleBtn = e.target.closest(".node-toggle");
+            if (toggleBtn) {
+                const nodeId = toggleBtn.getAttribute("data-node-id");
+                jm.toggle_node(nodeId);
+                return; // 不再往下處理
+            }
+
+            // 2) 點到 label（含 checkbox）→ 不展開／收合
+            if (e.target.closest('label.node-label')) return;
+
+            // 3) 原始 jsMind 的 jmexpander 已經被我們隱藏，這行其實不會再觸發
+            if (e.target.closest('.jmexpander')) return;
+
+            // 4) 其他地方：點節點本體也可以展開／收合
+            const nodeEl = e.target.closest(".jmnode");
+            if (!nodeEl) return;
+
+            const nodeId = nodeEl.getAttribute("nodeid");
+            const node = jm.get_node(nodeId);
+            if (!node || !node.children || node.children.length === 0) return;
+
+            jm.toggle_node(nodeId);
+        });
+
+        // ================================
+        // 7. 雙擊節點文字 → 改名字
+        // ================================
+        document.getElementById("jsmind_container").addEventListener("dblclick", (e) => {
+            // 只在雙擊文字 .node-title 時觸發
+            const titleSpan = e.target.closest(".node-title");
+            if (!titleSpan) return;
+
+            const nodeId = titleSpan.getAttribute("data-node-id");
+            const jmNode = jm.get_node(nodeId);
+            if (!jmNode) return;
+
+            const currentTopic =
+                (treeNodeMap[nodeId] && treeNodeMap[nodeId].topic) ||
+                jmNode.topic ||
+                "";
+
+            const newTitle = prompt("請輸入新的節點名稱：", currentTopic);
+            if (newTitle === null) return;
+            const t = newTitle.trim();
+            if (!t || t === currentTopic) return;
+
+            // 更新原始資料與 jsMind 節點
+            if (treeNodeMap[nodeId]) {
+                treeNodeMap[nodeId].topic = t;
+            }
+            jmNode.topic = t;
+
+            // 通知 jsMind 更新 node（重新計算佈局）
+            if (typeof jm.update_node === "function") {
+                jm.update_node(nodeId, t);
+            } else if (typeof jm.set_node_topic === "function") {
+                jm.set_node_topic(nodeId, t);
+            }
+
+            // 再次套用我們的 label / checkbox 模板
+            const nodeInfo = nodeMap[nodeId];
+            if (nodeInfo) {
+                enhanceSingleNode(nodeInfo);
+            }
+
+            refreshProgressDisplay();
+        });
+
+        // ================================
+        // 8. checkbox 勾選 → 更新進度
+        // ================================
+        document.getElementById("jsmind_container").addEventListener("change", (e) => {
+            const target = e.target;
+            if (target.matches('input[type="checkbox"][data-node-id]')) {
+                const nodeId = target.getAttribute("data-node-id");
+                const done = target.checked;
+                updateProgressFromLeaf(nodeId, done);
+            }
+        });
+
+        // 初始化顯示 0%
+        refreshProgressDisplay();
+    </script>
+</body>
+
+</html>
